@@ -3,7 +3,12 @@
 <head>
 <title>Il Mio Slideshow Automatico</title>
 <style>
-  body { font-family: sans-serif; text-align: center; margin-top: 50px; background-color: #f0f0f0; }
+  body { 
+    font-family: sans-serif; 
+    text-align: center; 
+    margin-top: 50px; 
+    background-color: #f0f0f0; 
+  }
   #slideshow-container {
     width: 80%; /* Larghezza del contenitore */
     max-width: 960px; /* Larghezza massima */
@@ -36,8 +41,8 @@
   <p>Le foto vengono caricate automaticamente da Google Drive.</p>
 
 <script>
-  // Link pubblico al tuo file JSON, ora correttamente inserito!
-  const JSON_DATA_URL = 'https://drive.google.com/uc?export=download&id=1CzBHkfiEWE3rPNoSHjoQo5it9dFNcj9E'; 
+  // QUESTO È IL TUO LINK JSON CORRETTO E FINALE DAL GOOGLE SHEET
+  const JSON_DATA_URL = 'https://docs.google.com/spreadsheets/d/1i1Z36XHpTiiiW4GJYhqAleHZsAJ3yAeGRImJv5W5Rm0/gviz/tq?tqx=out:json'; 
   const slideshowImage = document.getElementById('slideshow-image');
   let images = [];
   let currentImageIndex = 0;
@@ -47,31 +52,49 @@
   async function fetchImages() {
     try {
       const response = await fetch(JSON_DATA_URL);
-      const data = await response.json();
-      images = data.images;
+      const text = await response.text(); // Leggi il testo intero
+      
+      // Il JSON di Google Sheets ha un wrapper speciale (google.visualization.Query.setResponse)
+      // Dobbiamo estrarre il JSON vero e proprio
+      const startIndex = text.indexOf('{');
+      const endIndex = text.lastIndexOf('}');
+      if (startIndex === -1 || endIndex === -1) {
+        throw new Error("Formato JSON del foglio Sheets non riconosciuto.");
+      }
+      const jsonString = text.substring(startIndex, endIndex + 1);
+      const data = JSON.parse(jsonString);
+
+      // Estrai gli URL delle immagini dalla struttura del JSON di Google Sheets
+      // Assumiamo che la colonna "ImageUrl" sia la prima colonna (index 0)
+      if (data && data.table && data.table.rows) {
+          images = data.table.rows.map(row => row.c[0].v);
+      } else {
+          images = []; // Nessun dato trovato
+      }
+
       if (images.length > 0) {
         startSlideshow();
       } else {
         slideshowImage.src = 'https://via.placeholder.com/960x540?text=Nessuna+immagine+trovata'; // Immagine placeholder
-        console.warn('Nessuna immagine trovata nel file JSON.');
+        console.warn('Nessuna immagine trovata nel file JSON del foglio Sheets.');
       }
     } catch (error) {
-      console.error('Errore durante il recupero del file JSON:', error);
+      console.error('Errore durante il recupero o parsing del file JSON del foglio Sheets:', error);
       slideshowImage.src = 'https://via.placeholder.com/960x540?text=Errore+caricamento+immagini'; // Immagine placeholder di errore
     }
   }
 
   function showImage() {
-    if (images.length === 0) return;
+    if (images.length === 0) {
+      console.log("Nessuna immagine da mostrare nello slideshow.");
+      return; 
+    }
 
-    // Aggiungi la classe fade-out prima di cambiare l'immagine
     slideshowImage.classList.add('fade-out');
     
-    // Attendere che l'immagine corrente sia completamente sbiadita prima di caricarne una nuova
     setTimeout(() => {
         slideshowImage.src = images[currentImageIndex];
         currentImageIndex = (currentImageIndex + 1) % images.length;
-        // Rimuovi fade-out e aggiungi fade-in per la nuova immagine
         slideshowImage.classList.remove('fade-out');
         slideshowImage.classList.add('fade-in');
     }, 1000); // Questo tempo deve corrispondere alla durata della transizione CSS (1s)
@@ -79,17 +102,17 @@
 
   function startSlideshow() {
     if (slideshowInterval) {
-      clearInterval(slideshowInterval); // Pulisce eventuali intervalli precedenti
+      clearInterval(slideshowInterval);
     }
-    showImage(); // Mostra la prima immagine immediatamente
-    slideshowInterval = setInterval(showImage, slideDuration + 1000); // 1s in più per la transizione (tempo di slide + tempo di transizione)
+    if (images.length > 0) {
+      showImage();
+      slideshowInterval = setInterval(showImage, slideDuration + 1000); // 1s in più per la transizione
+    } else {
+      console.warn("Non posso avviare lo slideshow, nessuna immagine caricata.");
+    }
   }
 
-  // Carica le immagini all'avvio
   fetchImages();
-
-  // Opzionale: Ricarica le immagini periodicamente per rilevare nuove aggiunte
-  // Se vuoi che lo slideshow carichi automaticamente le nuove immagini anche senza aggiornare la pagina
   setInterval(fetchImages, 5 * 60 * 1000); // Ogni 5 minuti controlla se ci sono nuove immagini nel JSON
 </script>
 
